@@ -1,6 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from "express";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import { extractForMessage, extractRequestSchema } from "./ai.js";
 import { prisma } from "./db.js";
 
@@ -35,6 +37,18 @@ function serializeMessage(message: { id: string; senderName: string; senderEmail
   };
 }
 
+function serializeLead(lead: { id: string; sourceMessageId: string; product: string; quantity: number; material: string | null; budget: number | null; status: string; createdAt: Date }) {
+  return { ...lead, createdAt: lead.createdAt.toISOString() };
+}
+
+const createLeadSchema = z.object({
+  sourceMessageId: z.string().trim().min(1),
+  product: z.string().trim().min(1),
+  quantity: z.number().int().positive(),
+  material: z.string().nullable().optional(),
+  budget: z.number().finite().nonnegative().nullable().optional(),
+}).strict();
+
 async function handleMessages(_request: Request, response: Response, next: NextFunction) {
   try {
     const records = await prisma.message.findMany({
@@ -64,7 +78,39 @@ app.get("/api/messages/:messageId", async (request, response, next) => {
 app.get("/api/leads", async (_request, response, next) => {
   try {
     const leads = await prisma.lead.findMany({ orderBy: { createdAt: "asc" } });
-    response.json(leads.map((lead) => ({ ...lead, createdAt: lead.createdAt.toISOString() })));
+    response.json(leads.map(serializeLead));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/leads", async (request, response, next) => {
+  try {
+    const parsed = createLeadSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "invalid_lead", details: parsed.error.flatten() });
+      return;
+    }
+
+    const message = await prisma.message.findUnique({ where: { id: parsed.data.sourceMessageId } });
+    if (!message) {
+      response.status(404).json({ error: "message_not_found" });
+      return;
+    }
+
+    const material = parsed.data.material?.trim() || null;
+    const lead = await prisma.lead.create({
+      data: {
+        id: randomUUID(),
+        sourceMessageId: parsed.data.sourceMessageId,
+        product: parsed.data.product,
+        quantity: parsed.data.quantity,
+        material,
+        budget: parsed.data.budget ?? null,
+        status: "NEW",
+      },
+    });
+    response.status(201).json(serializeLead(lead));
   } catch (error) {
     next(error);
   }

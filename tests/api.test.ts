@@ -37,6 +37,77 @@ describe("InboxIQ API", () => {
     expect(await prisma.lead.count()).toBe(0);
   });
 
+  it("creates multiple NEW leads for the same source message", async () => {
+    const payload = {
+      sourceMessageId: "message-perfect",
+      product: "  Desk  ",
+      quantity: 30,
+      material: "  Oak  ",
+      budget: 50000,
+    };
+
+    const first = await request(app).post("/api/leads").send(payload);
+    const second = await request(app).post("/api/leads").send(payload);
+
+    expect(first.status).toBe(201);
+    expect(first.body).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      sourceMessageId: "message-perfect",
+      product: "Desk",
+      quantity: 30,
+      material: "Oak",
+      budget: 50000,
+      status: "NEW",
+      createdAt: expect.any(String),
+    }));
+    expect(second.status).toBe(201);
+    expect(second.body.id).not.toBe(first.body.id);
+    expect(await prisma.lead.count({ where: { sourceMessageId: "message-perfect" } })).toBe(2);
+  });
+
+  it("normalizes optional lead values", async () => {
+    const response = await request(app).post("/api/leads").send({
+      sourceMessageId: "message-partial",
+      product: "Chair",
+      quantity: 12,
+      material: "   ",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.material).toBeNull();
+    expect(response.body.budget).toBeNull();
+  });
+
+  it.each([
+    ["blank product", { sourceMessageId: "message-perfect", product: "   ", quantity: 1 }],
+    ["zero quantity", { sourceMessageId: "message-perfect", product: "Desk", quantity: 0 }],
+    ["negative quantity", { sourceMessageId: "message-perfect", product: "Desk", quantity: -1 }],
+    ["fractional quantity", { sourceMessageId: "message-perfect", product: "Desk", quantity: 1.5 }],
+    ["string quantity", { sourceMessageId: "message-perfect", product: "Desk", quantity: "1" }],
+    ["negative budget", { sourceMessageId: "message-perfect", product: "Desk", quantity: 1, budget: -1 }],
+    ["string budget", { sourceMessageId: "message-perfect", product: "Desk", quantity: 1, budget: "100" }],
+    ["client status", { sourceMessageId: "message-perfect", product: "Desk", quantity: 1, status: "CONTACTED" }],
+  ])("rejects invalid lead payload: %s", async (_name, payload) => {
+    const countBefore = await prisma.lead.count();
+    const response = await request(app).post("/api/leads").send(payload);
+
+    expect(response.status).toBe(400);
+    expect(await prisma.lead.count()).toBe(countBefore);
+  });
+
+  it("rejects an unknown source message without creating a lead", async () => {
+    const countBefore = await prisma.lead.count();
+    const response = await request(app).post("/api/leads").send({
+      sourceMessageId: "missing-message",
+      product: "Desk",
+      quantity: 1,
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "message_not_found" });
+    expect(await prisma.lead.count()).toBe(countBefore);
+  });
+
   it("returns a stable error for malformed API JSON", async () => {
     const response = await request(app)
       .post("/api/ai/extract")
