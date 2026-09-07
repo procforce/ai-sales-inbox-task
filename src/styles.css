@@ -68,6 +68,7 @@ h3 { font-size: .94rem; margin: 0 0 3px; }
 .form-field input:focus { border-color: #0c8f71; outline: 3px solid #0c8f7126; }
 .button { border: 0; border-radius: 7px; cursor: pointer; font-size: .84rem; font-weight: 750; min-height: 40px; padding: 9px 14px; }
 .button:disabled { cursor: wait; opacity: .6; }
+.button-primary { background: #0c8f71; color: #fff; }
 .button-secondary { background: #e4f2ea; color: #17684f; }
 .form-alert, .form-message { border-radius: 7px; font-size: .8rem; margin: 14px 0 0; padding: 10px 12px; }
 .form-alert { background: #fff0ee; color: #9b352d; }
@@ -78,8 +79,11 @@ h3 { font-size: .94rem; margin: 0 0 3px; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 30px; }
 .tag { background: #edf6f0; border-radius: 100px; color: #39715b; font-size: .72rem; font-weight: 700; padding: 5px 10px; }
 .lead-card { align-items: flex-start; background: #fff; border: 1px solid #dce5de; border-radius: 12px; display: flex; gap: 10px; margin-top: 10px; padding: 14px; }
+.lead-card-content { flex: 1; min-width: 0; }
 .lead-card p { color: #63736b; font-size: .78rem; margin-bottom: 10px; }
 .lead-card .muted { font-size: .72rem; }
+.lead-card .button { flex: 0 0 auto; }
+.lead-card .form-alert { color: #9b352d; margin: 10px 0 0; }
 
 @media (max-width: 720px) {
   .topbar { gap: 14px; padding: 14px 18px; }
@@ -92,4 +96,5 @@ h3 { font-size: .94rem; margin: 0 0 3px; }
   .message-preview { max-width: 52vw; }
   .detail-grid { grid-template-columns: 1fr; }
   .message-detail { padding: 22px 18px; }
+  .lead-card { align-items: stretch; flex-direction: column; }
 }
