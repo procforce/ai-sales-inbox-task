@@ -70,6 +70,82 @@ function MessageRow({ message }: { message: Message }) {
   );
 }
 
+type LeadFormValues = {
+  product: string;
+  quantity: string;
+  material: string;
+  budget: string;
+};
+
+const emptyLeadForm: LeadFormValues = {
+  product: "",
+  quantity: "",
+  material: "",
+  budget: "",
+};
+
+function LeadForm({ messageId }: { messageId: string }) {
+  const [values, setValues] = useState<LeadFormValues>(emptyLeadForm);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState("");
+  const [extractionMessage, setExtractionMessage] = useState("");
+
+  const updateField = (field: keyof LeadFormValues, value: string) => {
+    setValues((current) => ({ ...current, [field]: value }));
+  };
+
+  const extractLead = async () => {
+    setExtractionError("");
+    setExtractionMessage("");
+    setIsExtracting(true);
+    try {
+      const extraction = await api.extractLead(messageId);
+      const hasData = Object.values(extraction).some((value) => value !== null && value !== undefined);
+      setValues((current) => ({
+        product: current.product === "" && extraction.product != null ? extraction.product : current.product,
+        quantity: current.quantity === "" && extraction.quantity != null ? String(extraction.quantity) : current.quantity,
+        material: current.material === "" && extraction.material != null ? extraction.material : current.material,
+        budget: current.budget === "" && extraction.budget != null ? String(extraction.budget) : current.budget,
+      }));
+      if (!hasData) setExtractionMessage("No data was extracted. You can fill in the form manually.");
+    } catch {
+      setExtractionError("Extraction failed. You can still fill in the form manually.");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  return (
+    <aside className="panel lead-form-panel" aria-labelledby="lead-form-heading">
+      <p className="eyebrow">Next step</p>
+      <h2 id="lead-form-heading">Lead details</h2>
+      <button className="button button-secondary" type="button" onClick={extractLead} disabled={isExtracting}>
+        {isExtracting ? "Extracting…" : "Extract with AI"}
+      </button>
+      {extractionError && <p className="form-alert" role="alert">{extractionError}</p>}
+      {extractionMessage && <p className="form-message" role="status">{extractionMessage}</p>}
+      <form className="lead-form">
+        <div className="form-field">
+          <label htmlFor="lead-product">Product</label>
+          <input id="lead-product" value={values.product} onChange={(event) => updateField("product", event.target.value)} />
+        </div>
+        <div className="form-field">
+          <label htmlFor="lead-quantity">Quantity</label>
+          <input id="lead-quantity" type="number" min="1" step="1" value={values.quantity} onChange={(event) => updateField("quantity", event.target.value)} />
+        </div>
+        <div className="form-field">
+          <label htmlFor="lead-material">Material</label>
+          <input id="lead-material" value={values.material} onChange={(event) => updateField("material", event.target.value)} />
+        </div>
+        <div className="form-field">
+          <label htmlFor="lead-budget">Budget</label>
+          <input id="lead-budget" type="number" min="0" step="0.01" value={values.budget} onChange={(event) => updateField("budget", event.target.value)} />
+        </div>
+      </form>
+    </aside>
+  );
+}
+
 function DetailPage({ messageId }: { messageId: string }) {
   const [message, setMessage] = useState<Message | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -98,10 +174,7 @@ function DetailPage({ messageId }: { messageId: string }) {
           </dl>
           <div className="message-body">{message.body}</div>
         </article>
-        <aside className="panel placeholder-panel" aria-label="Lead extraction status">
-          <p className="eyebrow">Next step</p>
-          <p className="placeholder" role="status">Lead extraction not implemented yet.</p>
-        </aside>
+        <LeadForm messageId={messageId} />
       </section>
     </main>
   );
