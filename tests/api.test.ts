@@ -108,6 +108,71 @@ describe("InboxIQ API", () => {
     expect(await prisma.lead.count()).toBe(countBefore);
   });
 
+  it("changes a NEW lead to CONTACTED and returns the raw persisted lead", async () => {
+    const created = await request(app).post("/api/leads").send({
+      sourceMessageId: "message-failure",
+      product: "Meeting table",
+      quantity: 1,
+    });
+
+    const response = await request(app)
+      .patch(`/api/leads/${created.body.id}/status`)
+      .send({ status: "CONTACTED" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expect.objectContaining({
+      id: created.body.id,
+      status: "CONTACTED",
+      createdAt: expect.any(String),
+    }));
+    expect(response.body).not.toHaveProperty("lead");
+    expect((await prisma.lead.findUnique({ where: { id: created.body.id } }))?.status).toBe("CONTACTED");
+  });
+
+  it.each([
+    ["NEW", { status: "NEW" }],
+    ["missing status", {}],
+    ["string body", "CONTACTED"],
+    ["extra field", { status: "CONTACTED", reason: "called" }],
+  ])("rejects invalid status payload: %s", async (_name, payload) => {
+    const created = await request(app).post("/api/leads").send({
+      sourceMessageId: "message-empty",
+      product: "Whiteboard",
+      quantity: 6,
+    });
+
+    const response = await request(app).patch(`/api/leads/${created.body.id}/status`).send(payload);
+
+    expect(response.status).toBe(400);
+    expect((await prisma.lead.findUnique({ where: { id: created.body.id } }))?.status).toBe("NEW");
+  });
+
+  it("rejects an unknown lead status update", async () => {
+    const response = await request(app)
+      .patch("/api/leads/missing-lead/status")
+      .send({ status: "CONTACTED" });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "lead_not_found" });
+  });
+
+  it("rejects a repeated status transition without changing the persisted status", async () => {
+    const created = await request(app).post("/api/leads").send({
+      sourceMessageId: "message-partial",
+      product: "Chair",
+      quantity: 12,
+    });
+    await request(app).patch(`/api/leads/${created.body.id}/status`).send({ status: "CONTACTED" });
+
+    const repeated = await request(app)
+      .patch(`/api/leads/${created.body.id}/status`)
+      .send({ status: "CONTACTED" });
+
+    expect(repeated.status).toBe(409);
+    expect(repeated.body).toEqual({ error: "invalid_status_transition" });
+    expect((await prisma.lead.findUnique({ where: { id: created.body.id } }))?.status).toBe("CONTACTED");
+  });
+
   it("returns a stable error for malformed API JSON", async () => {
     const response = await request(app)
       .post("/api/ai/extract")

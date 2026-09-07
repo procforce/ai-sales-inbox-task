@@ -49,6 +49,10 @@ const createLeadSchema = z.object({
   budget: z.number().finite().nonnegative().nullable().optional(),
 }).strict();
 
+const updateLeadStatusSchema = z.object({
+  status: z.literal("CONTACTED"),
+}).strict();
+
 async function handleMessages(_request: Request, response: Response, next: NextFunction) {
   try {
     const records = await prisma.message.findMany({
@@ -111,6 +115,34 @@ app.post("/api/leads", async (request, response, next) => {
       },
     });
     response.status(201).json(serializeLead(lead));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/leads/:leadId/status", async (request, response, next) => {
+  try {
+    const parsed = updateLeadStatusSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ error: "invalid_status", details: parsed.error.flatten() });
+      return;
+    }
+
+    const existingLead = await prisma.lead.findUnique({ where: { id: request.params.leadId } });
+    if (!existingLead) {
+      response.status(404).json({ error: "lead_not_found" });
+      return;
+    }
+    if (existingLead.status !== "NEW") {
+      response.status(409).json({ error: "invalid_status_transition" });
+      return;
+    }
+
+    const lead = await prisma.lead.update({
+      where: { id: existingLead.id },
+      data: { status: parsed.data.status },
+    });
+    response.json(serializeLead(lead));
   } catch (error) {
     next(error);
   }
