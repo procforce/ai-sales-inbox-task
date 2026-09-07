@@ -5,8 +5,23 @@ export type Lead = {
   quantity: number;
   material: string | null;
   budget: number | null;
-  status: string;
+  status: "NEW" | "CONTACTED";
   createdAt: string;
+};
+
+export type Extraction = {
+  product?: string | null;
+  quantity?: number | null;
+  material?: string | null;
+  budget?: number | null;
+};
+
+export type CreateLeadPayload = {
+  sourceMessageId: string;
+  product: string;
+  quantity: number;
+  material: string | null;
+  budget: number | null;
 };
 
 export type Message = {
