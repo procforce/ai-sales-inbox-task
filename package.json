@@ -11,7 +11,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "typecheck": "tsc --noEmit",
     "test": "npm run db:reset && vitest run",
-    "db:reset": "RUST_LOG=info prisma migrate reset --force",
+    "db:reset": "cross-env RUST_LOG=info prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "start": "node dist/index.js"
   },
@@ -33,6 +33,7 @@
     "@types/supertest": "6.0.3",
     "@vitejs/plugin-react": "5.0.2",
     "concurrently": "9.2.0",
+    "cross-env": "^10.1.0",
     "prisma": "6.16.0",
     "supertest": "7.1.4",
     "tsx": "4.20.3",
